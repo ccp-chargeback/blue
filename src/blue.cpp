@@ -8,6 +8,7 @@
 #include "Blue.h"
 #include "BluePaths.h"
 #include "BlueOS.h"
+#include "BlueStatistics.h"
 #include "ResourceLoading.h"
 #include "BlueSocketLogger.h"
 #if BLUE_WITH_PYTHON
@@ -737,6 +738,18 @@ PyMODINIT_FUNC BLUE_EXPORTED_INIT
 	PatchPythonExit();
 
 	auto blueModule = PyOS->BlueModule();
+	if ( !blueModule )
+	{
+		return nullptr;
+	}
+
+	// The color constants can only be added once the type objects have been finalized, which
+	// happens while the module is being created.
+	if ( !BlueTelemetryColor::RegisterConstants() )
+	{
+		return nullptr;
+	}
+
 	return blueModule;
 }
 

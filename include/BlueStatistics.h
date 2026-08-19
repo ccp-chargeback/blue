@@ -73,6 +73,59 @@ public:
 TYPEDEF_BLUECLASS( BlueStatisticsTelemetryConfig );
 
 
+BLUE_DECLARE( BlueTelemetryColor );
+BLUE_CLASS( BlueTelemetryColor ) : public IRoot
+{
+public:
+	EXPOSE_TO_BLUE();
+
+	// Returns the shared instance for the given color. Colors are interned so that the same color
+	// always yields the same object, no matter whether it comes from one of the constants on the
+	// exposed type or from a registered Telemetry category, which is what lets them be compared
+	// with each other.
+	static BlueTelemetryColor* Get( CcpColor color );
+
+#if BLUE_WITH_PYTHON
+	// Adds the colors of the CcpColor enum as constants on the exposed type, so they can be used
+	// as blue.BlueTelemetryColor.SteelBlue. Has to be called once the blue module has been
+	// created, as that is where the Python type object is finalized.
+	static bool RegisterConstants();
+#endif
+
+	void SetColor( CcpColor color );
+	CcpColor GetColor() const;
+
+	// The color as a 0xRRGGBB value, and the name it is known by, such as "SteelBlue"
+	uint32_t GetValue() const;
+	std::string GetName() const;
+
+protected:
+	CcpColor m_color{CcpColor::White};
+};
+
+TYPEDEF_BLUECLASS( BlueTelemetryColor );
+
+
+BLUE_DECLARE( BlueTelemetryCategory );
+BLUE_CLASS( BlueTelemetryCategory ) : public IRoot
+{
+public:
+	EXPOSE_TO_BLUE();
+
+	// Attaches this wrapper to a category owned by the Telemetry category registry. Registered
+	// categories live for the lifetime of the process, so the pointer stays valid once attached.
+	void AttachCategory( const CcpTelemetryCategory* category );
+
+	const std::string& GetName() const;
+	BlueTelemetryColor* GetColor() const;
+
+protected:
+	const CcpTelemetryCategory* m_category{nullptr};
+};
+
+TYPEDEF_BLUECLASS( BlueTelemetryCategory );
+
+
 BLUE_DECLARE( BlueStatistics );
 BLUE_CLASS( BlueStatistics ) : public IRoot
 {

@@ -411,6 +411,69 @@ void BlueStatistics::SetTelemetryMaxThreadCount( uint32_t maxThreadCount )
 	m_telemetryMaxThreadCount = maxThreadCount;
 }
 
+BlueTelemetryColor* BlueTelemetryColor::Get( CcpColor color )
+{
+	// Only ever reached from the Python exposure, which holds the GIL, so the store needs no
+	// locking of its own.
+	static TrackableStdMap<CcpColor, BlueTelemetryColorPtr> s_colors( "BlueTelemetryColor/s_colors" );
+
+	BlueTelemetryColorPtr& instance = s_colors[color];
+	if( !instance )
+	{
+		instance.CreateInstance();
+		instance->SetColor( color );
+	}
+
+	return instance;
+}
+
+void BlueTelemetryColor::SetColor( CcpColor color )
+{
+	m_color = color;
+}
+
+CcpColor BlueTelemetryColor::GetColor() const
+{
+	return m_color;
+}
+
+uint32_t BlueTelemetryColor::GetValue() const
+{
+	return static_cast<uint32_t>( m_color );
+}
+
+std::string BlueTelemetryColor::GetName() const
+{
+	const std::string_view name = CcpColorToString( m_color );
+	return std::string( name );
+}
+
+void BlueTelemetryCategory::AttachCategory( const CcpTelemetryCategory* category )
+{
+	m_category = category;
+}
+
+const std::string& BlueTelemetryCategory::GetName() const
+{
+	if( !m_category )
+	{
+		static const std::string s_noCategory;
+		return s_noCategory;
+	}
+
+	return CcpTelemetryCategoryGetName( *m_category );
+}
+
+BlueTelemetryColor* BlueTelemetryCategory::GetColor() const
+{
+	if( !m_category )
+	{
+		return nullptr;
+	}
+
+	return BlueTelemetryColor::Get( CcpTelemetryCategoryGetColor( *m_category ) );
+}
+
 CcpStatisticsEntry::CcpStatisticsEntry( IRoot* lockobj ) :
 	m_statsEntry( nullptr ),
 	m_resetPerFrame( false ),
