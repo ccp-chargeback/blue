@@ -4,6 +4,7 @@
 #include "Blue.h"
 #include "IBlueOS.h"
 #include "BlueStatistics.h"
+#include "BlueTelemetryZones.h"
 
 #if BLUE_WITH_PYTHON
 extern const char *Immortalize( PyObject *s );
@@ -604,7 +605,7 @@ PyObject* PyEnterZone( PyObject* self, PyObject* args )
 	{
 		return nullptr;
 	}
-	CcpTelemetryEnterZone( frame, zone, fileName, static_cast<uint32_t>( PyFrame_GetLineNumber( frame ) ) );
+	BlueTelemetryEnterZone( frame, zone, fileName, static_cast<uint32_t>( PyFrame_GetLineNumber( frame ) ) );
 	Py_XDECREF( codeObj );  // Release the reference to the frame code
 #endif
 	Py_RETURN_NONE;
@@ -613,7 +614,7 @@ PyObject* PyEnterZone( PyObject* self, PyObject* args )
 PyObject* PyLeaveZone( PyObject* self, PyObject* args )
 {
 #if CCP_TELEMETRY_ENABLED
-	CcpTelemetryLeaveZone( PyEval_GetFrame() );
+	BlueTelemetryLeaveZone( PyEval_GetFrame() );
 #endif
 	Py_RETURN_NONE;
 }
@@ -634,7 +635,7 @@ PyObject* PyAppendToZone( PyObject* self, PyObject* args )
 		return nullptr;
 	}
 
-	CcpTelemetryZoneAddText( PyEval_GetFrame(), appendText );
+	BlueTelemetryZoneAddText( PyEval_GetFrame(), appendText );
 #endif
 	Py_RETURN_NONE;
 }
