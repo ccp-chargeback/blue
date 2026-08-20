@@ -453,6 +453,11 @@ void BlueTelemetryCategory::AttachCategory( const CcpTelemetryCategory* category
 	m_category = category;
 }
 
+const CcpTelemetryCategory* BlueTelemetryCategory::GetCategory() const
+{
+	return m_category;
+}
+
 const std::string& BlueTelemetryCategory::GetName() const
 {
 	if( !m_category )

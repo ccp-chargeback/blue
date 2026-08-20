@@ -813,6 +813,67 @@ PyObject* WrapTelemetryCategory( const CcpTelemetryCategory& category )
 	return BlueWrapObjectForPython( pyCategory );
 }
 
+PyObject* WrapTelemetryCategories( const CcpTelemetryCategories& categories )
+{
+	PyObject* categoryList = PyList_New( 0 );
+	if( !categoryList )
+	{
+		return nullptr;
+	}
+
+	for( const CcpTelemetryCategory& category : categories )
+	{
+		PyObject* pyCategory = WrapTelemetryCategory( category );
+		if( !pyCategory )
+		{
+			Py_DECREF( categoryList );
+			return nullptr;
+		}
+
+		// PyList_Append does not steal the reference we got from the wrapper
+		PyList_Append( categoryList, pyCategory );
+		Py_DECREF( pyCategory );
+	}
+
+	return categoryList;
+}
+
+// Turns a Python sequence of BlueTelemetryCategory into the list CcpCore expects. Sets a Python
+// exception and returns false if the sequence holds anything else.
+bool UnwrapTelemetryCategories( PyObject* sequenceObject, const char* caller, CcpTelemetryCategories& categories )
+{
+	PyObject* fastSequence = PySequence_Fast( sequenceObject, "expected a sequence of BlueTelemetryCategory" );
+	if( !fastSequence )
+	{
+		return false;
+	}
+
+	const Py_ssize_t count = PySequence_Fast_GET_SIZE( fastSequence );
+	categories.reserve( static_cast<size_t>( count ) );
+
+	for( Py_ssize_t i = 0; i < count; ++i )
+	{
+		// PySequence_Fast_GET_ITEM hands out a borrowed reference
+		PyObject* categoryObject = PySequence_Fast_GET_ITEM( fastSequence, i );
+		BlueTelemetryCategory* pyCategory = BluePythonCast<BlueTelemetryCategory*>( categoryObject );
+		if( !pyCategory || !pyCategory->GetCategory() )
+		{
+			Py_DECREF( fastSequence );
+			categories.clear();
+			PyErr_Format(
+				PyExc_TypeError,
+				"%s expects a sequence of BlueTelemetryCategory",
+				caller );
+			return false;
+		}
+
+		categories.emplace_back( *pyCategory->GetCategory() );
+	}
+
+	Py_DECREF( fastSequence );
+	return true;
+}
+
 PyObject* PyRegisterTelemetryCategory( PyObject* self, PyObject* args )
 {
 	const char* name = nullptr;
@@ -853,27 +914,37 @@ PyObject* PyRegisterTelemetryCategory( PyObject* self, PyObject* args )
 
 PyObject* PyGetRegisteredTelemetryCategories( PyObject* self, PyObject* args )
 {
-	PyObject* categoryList = PyList_New( 0 );
-	if( !categoryList )
+	return WrapTelemetryCategories( CcpTelemetryGetRegisteredCategories() );
+}
+
+PyObject* PySetActiveTelemetryCategories( PyObject* self, PyObject* args )
+{
+	PyObject* categoriesObject = nullptr;
+	if( !PyArg_ParseTuple( args, "O", &categoriesObject ) )
 	{
 		return nullptr;
 	}
 
-	for( const CcpTelemetryCategory& category : CcpTelemetryGetRegisteredCategories() )
+	CcpTelemetryCategories categories;
+	if( !UnwrapTelemetryCategories( categoriesObject, "SetActiveTelemetryCategories", categories ) )
 	{
-		PyObject* pyCategory = WrapTelemetryCategory( category );
-		if( !pyCategory )
-		{
-			Py_DECREF( categoryList );
-			return nullptr;
-		}
-
-		// PyList_Append does not steal the reference we got from the wrapper
-		PyList_Append( categoryList, pyCategory );
-		Py_DECREF( pyCategory );
+		return nullptr;
 	}
 
-	return categoryList;
+	if( !CcpTelemetrySetActiveCategories( categories ) )
+	{
+		PyErr_SetString(
+			BLUE_GET_EXCEPTION( TelemetryCategoryError ),
+			"Could not set the active Telemetry categories" );
+		return nullptr;
+	}
+
+	Py_RETURN_NONE;
+}
+
+PyObject* PyGetActiveTelemetryCategories( PyObject* self, PyObject* args )
+{
+	return WrapTelemetryCategories( CcpTelemetryGetActiveCategories() );
 }
 
 } // anonymous namespace
@@ -1006,9 +1077,7 @@ const Be::ClassInfo* BlueStatistics::ExposeToBlue()
 			"RegisterTelemetryCategory",
 			PyRegisterTelemetryCategory,
 			"Registers a Telemetry category, or returns the already registered category if one exists\n"
-			"with the given name. Raises a TelemetryCategoryError if the category could not be registered,\n"
-			"which is the case for an empty name, when the category registry is full, or when Telemetry is\n"
-			"not available in this build.\n"
+			"with the given name. Raises a TelemetryCategoryError if the category could not be registered.\n"
 			":param name: category name\n"
 			":type name: str\n"
 			":param color: color of the category, such as one of the constants of\n"
@@ -1024,6 +1093,30 @@ const Be::ClassInfo* BlueStatistics::ExposeToBlue()
 			PyGetRegisteredTelemetryCategories,
 			"Get all currently registered Telemetry categories. Returns an empty list if Telemetry is not\n"
 			"available in this build.\n"
+			":rtype: list[BlueTelemetryCategory]"
+		)
+
+		MAP_METHOD
+		(
+			"SetActiveTelemetryCategories",
+			PySetActiveTelemetryCategories,
+			"Replaces the set of Telemetry categories that are captured. Only zones tagged with an active\n"
+			"category are recorded; zones of any other category are cheap no-ops. Pass an empty sequence to\n"
+			"stop capturing any category. Raises a TelemetryCategoryError if the active categories could not\n"
+			"be set.\n"
+			":param categories: the categories to activate, as returned by RegisterTelemetryCategory or\n"
+			"                   GetRegisteredTelemetryCategories\n"
+			":type categories: list[BlueTelemetryCategory]\n"
+			":rtype: None\n"
+			":raises TelemetryCategoryError: if the active categories could not be set"
+		)
+
+		MAP_METHOD
+		(
+			"GetActiveTelemetryCategories",
+			PyGetActiveTelemetryCategories,
+			"Get the Telemetry categories that are currently being captured. Returns an empty list if no\n"
+			"category is active.\n"
 			":rtype: list[BlueTelemetryCategory]"
 		)
 

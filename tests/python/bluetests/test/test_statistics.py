@@ -129,3 +129,107 @@ class TestBlueStatistics(unittest.TestCase):
         self.assertIn("core", names)
         self.assertIn("blue", names)
         self.assertIn("test category in category list", names)
+
+    def restoreActiveTelemetryCategories(self):
+        """
+        Restore the currently active categories once the running test is done. The active set is
+        process wide state, so a test that changes it has to put it back for the tests that follow.
+        """
+        import blue
+
+        active = blue.statistics.GetActiveTelemetryCategories()
+        self.addCleanup(blue.statistics.SetActiveTelemetryCategories, active)
+
+    def test_setActiveTelemetryCategories(self):
+        """
+        Test that the categories passed to SetActiveTelemetryCategories are the ones reported as
+        active afterwards.
+        """
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        first = blue.statistics.RegisterTelemetryCategory("test category set active")
+        second = blue.statistics.RegisterTelemetryCategory("test category also set active")
+
+        blue.statistics.SetActiveTelemetryCategories([first, second])
+
+        names = [category.name for category in blue.statistics.GetActiveTelemetryCategories()]
+
+        # Active categories come back in registration order rather than the order they were passed in
+        self.assertCountEqual(names, [first.name, second.name])
+
+    def test_setActiveTelemetryCategoriesReplacesThePreviousOnes(self):
+        """
+        Test that setting the active categories replaces the previously active ones rather than
+        adding to them.
+        """
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        first = blue.statistics.RegisterTelemetryCategory("test category active first")
+        second = blue.statistics.RegisterTelemetryCategory("test category active second")
+
+        blue.statistics.SetActiveTelemetryCategories([first])
+        blue.statistics.SetActiveTelemetryCategories([second])
+
+        names = [category.name for category in blue.statistics.GetActiveTelemetryCategories()]
+
+        self.assertEqual(names, [second.name])
+
+    def test_setActiveTelemetryCategoriesFromAnySequence(self):
+        """
+        Test that the categories can be handed over in any kind of sequence, not just a list.
+        """
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        category = blue.statistics.RegisterTelemetryCategory("test category set active as a tuple")
+
+        blue.statistics.SetActiveTelemetryCategories((category,))
+
+        names = [category.name for category in blue.statistics.GetActiveTelemetryCategories()]
+
+        self.assertEqual(names, ["test category set active as a tuple"])
+
+    def test_setNoActiveTelemetryCategories(self):
+        """
+        Test that an empty sequence deactivates every category.
+        """
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        category = blue.statistics.RegisterTelemetryCategory("test category deactivated again")
+        blue.statistics.SetActiveTelemetryCategories([category])
+
+        blue.statistics.SetActiveTelemetryCategories([])
+
+        self.assertEqual(blue.statistics.GetActiveTelemetryCategories(), [])
+
+    def test_setActiveTelemetryCategoriesWithInvalidCategories(self):
+        """
+        Test that only categories can be activated, and that a rejected call leaves the active
+        categories alone.
+        """
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        category = blue.statistics.RegisterTelemetryCategory("test category surviving a bad call")
+        blue.statistics.SetActiveTelemetryCategories([category])
+
+        with self.assertRaises(TypeError):
+            blue.statistics.SetActiveTelemetryCategories(["test category surviving a bad call"])
+
+        with self.assertRaises(TypeError):
+            blue.statistics.SetActiveTelemetryCategories([category, None])
+
+        with self.assertRaises(TypeError):
+            blue.statistics.SetActiveTelemetryCategories(42)
+
+        names = [category.name for category in blue.statistics.GetActiveTelemetryCategories()]
+
+        self.assertEqual(names, ["test category surviving a bad call"])

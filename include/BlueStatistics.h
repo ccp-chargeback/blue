@@ -116,6 +116,9 @@ public:
 	// categories live for the lifetime of the process, so the pointer stays valid once attached.
 	void AttachCategory( const CcpTelemetryCategory* category );
 
+	// The category this wrapper is attached to, or nullptr if it was never attached
+	const CcpTelemetryCategory* GetCategory() const;
+
 	const std::string& GetName() const;
 	BlueTelemetryColor* GetColor() const;
 
