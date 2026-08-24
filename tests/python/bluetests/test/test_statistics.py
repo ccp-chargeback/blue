@@ -209,6 +209,58 @@ class TestBlueStatistics(unittest.TestCase):
 
         self.assertEqual(blue.statistics.GetActiveTelemetryCategories(), [])
 
+    def test_setUnsetResetActiveTelemetryCategory(self):
+        import blue
+
+        self.restoreActiveTelemetryCategories()
+
+        category = blue.statistics.RegisterTelemetryCategory("cpp")
+        blue.statistics.SetActiveTelemetryCategories([category])
+        self.assertIn(category, blue.statistics.GetActiveTelemetryCategories())
+        blue.statistics.SetActiveTelemetryCategories([])
+        self.assertNotIn(category, blue.statistics.GetActiveTelemetryCategories())
+        blue.statistics.SetActiveTelemetryCategories([category])
+        self.assertIn(category, blue.statistics.GetActiveTelemetryCategories())
+
+    def test_telemetryCategoriesCompareByName(self):
+        """
+        Test that two lookups of the same registered category compare equal and hash the same, even
+        though every lookup hands out a wrapper of its own.
+        """
+        import blue
+
+        name = "test category compared by name"
+
+        registered = blue.statistics.RegisterTelemetryCategory(name)
+        lookedUp = [
+            category
+            for category in blue.statistics.GetRegisteredTelemetryCategories()
+            if category.name == name
+        ][0]
+        other = blue.statistics.RegisterTelemetryCategory("test category compared to another")
+
+        self.assertIsNot(registered, lookedUp)
+        self.assertEqual(registered, lookedUp)
+        self.assertNotEqual(registered, other)
+
+        # Categories that compare equal have to hash the same to work as keys and in sets
+        self.assertEqual(hash(registered), hash(lookedUp))
+        self.assertEqual({registered: "value"}[lookedUp], "value")
+        self.assertEqual(len({registered, lookedUp}), 1)
+
+        # The type picked up both when it was finalized, so the methods on it agree with the
+        # operators rather than with the identity comparison of the wrapper they are inherited from
+        self.assertTrue(type(registered).__eq__(registered, lookedUp))
+        self.assertFalse(type(registered).__eq__(registered, other))
+        self.assertEqual(type(registered).__hash__(registered), hash(registered))
+
+        # Comparing against anything but a category falls back to identity rather than raising
+        self.assertNotEqual(registered, name)
+        self.assertNotEqual(registered, None)
+
+        with self.assertRaises(TypeError):
+            registered < other
+
     def test_setActiveTelemetryCategoriesWithInvalidCategories(self):
         """
         Test that only categories can be activated, and that a rejected call leaves the active

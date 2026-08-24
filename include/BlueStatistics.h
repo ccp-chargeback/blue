@@ -112,6 +112,14 @@ BLUE_CLASS( BlueTelemetryCategory ) : public IRoot
 public:
 	EXPOSE_TO_BLUE();
 
+#if BLUE_WITH_PYTHON
+	// Gives the exposed type an equality and a hash of its own, so that categories compare by the
+	// name they were registered with rather than by the identity of the wrapper that was handed out
+	// for them. Has to be called before the blue module is created, as the Python type object picks
+	// the two up while it is being finalized as part of that.
+	static bool RegisterComparison();
+#endif
+
 	// Attaches this wrapper to a category owned by the Telemetry category registry. Registered
 	// categories live for the lifetime of the process, so the pointer stays valid once attached.
 	void AttachCategory( const CcpTelemetryCategory* category );

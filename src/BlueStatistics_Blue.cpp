@@ -392,6 +392,82 @@ const Be::ClassInfo* BlueTelemetryCategory::ExposeToBlue()
 }
 
 
+#if BLUE_WITH_PYTHON
+namespace
+{
+
+// The exposure hands out a fresh wrapper for every category it returns, so comparing wrappers by
+// identity - which is what BlueWrapper does - would tell two lookups of the same registered category
+// apart. Compare the categories behind them instead, which CcpCore does by name.
+PyObject* PyTelemetryCategoryRichCompare( PyObject* self, PyObject* other, int op )
+{
+	if( op != Py_EQ && op != Py_NE )
+	{
+		Py_RETURN_NOTIMPLEMENTED;
+	}
+
+	const BlueTelemetryCategory* left = BluePythonCast<BlueTelemetryCategory*>( self );
+	const BlueTelemetryCategory* right = BluePythonCast<BlueTelemetryCategory*>( other );
+	if( !left || !right )
+	{
+		// Comparing against anything but a category is left to Python, which falls back to identity
+		Py_RETURN_NOTIMPLEMENTED;
+	}
+
+	const CcpTelemetryCategory* leftCategory = left->GetCategory();
+	const CcpTelemetryCategory* rightCategory = right->GetCategory();
+
+	// A wrapper that was never attached to a category only ever equals another unattached one
+	const bool equal = ( leftCategory && rightCategory )
+		? *leftCategory == *rightCategory
+		: leftCategory == rightCategory;
+
+	return PyBool_FromLong( equal == ( op == Py_EQ ) );
+}
+
+// Hashes the name, as that is what equality is based on. Categories that compare equal have to hash
+// the same for them to work as dictionary keys and in sets.
+Py_hash_t PyTelemetryCategoryHash( PyObject* self )
+{
+	const BlueTelemetryCategory* category = BluePythonCast<BlueTelemetryCategory*>( self );
+	if( !category )
+	{
+		PyErr_SetString( PyExc_TypeError, "expected a BlueTelemetryCategory" );
+		return -1;
+	}
+
+	const Py_hash_t hash = static_cast<Py_hash_t>( std::hash<std::string>{}( category->GetName() ) );
+
+	// -1 is reserved for signalling an error
+	return hash != -1 ? hash : -2;
+}
+
+} // anonymous namespace
+
+bool BlueTelemetryCategory::RegisterComparison()
+{
+	PyTypeObject* type = ClassType_()->mTypeObject;
+
+	// The slots have to be in place before the type is finalized, as that is when Python derives the
+	// __eq__, __ne__ and __hash__ found on the type from them. Were they patched in afterwards, the
+	// operators would go through the ones set here while those methods would keep comparing and
+	// hashing the wrapper identity inherited from BlueWrapper.
+	if( type->tp_flags & Py_TPFLAGS_READY )
+	{
+		PyErr_SetString(
+			PyExc_RuntimeError,
+			"The BlueTelemetryCategory type was finalized before its comparison was registered" );
+		return false;
+	}
+
+	type->tp_richcompare = PyTelemetryCategoryRichCompare;
+	type->tp_hash = PyTelemetryCategoryHash;
+
+	return true;
+}
+#endif
+
+
 BLUE_DEFINE( BlueStatistics );
 
 #if BLUE_WITH_PYTHON

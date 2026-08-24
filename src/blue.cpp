@@ -726,6 +726,13 @@ PyMODINIT_FUNC BLUE_EXPORTED_INIT
 		CCP_LOGWARN( "Failed to register telemetry category for blue, no telemetry zones will be emitted" );
 	}
 
+	// Categories compare by the name they were registered with rather than by wrapper identity. This
+	// has to be set up before the type objects are finalized, which happens while BeOS starts up.
+	if ( !BlueTelemetryCategory::RegisterComparison() )
+	{
+		return nullptr;
+	}
+
 	CCP_LOG( "Initializing Resource Loading" );
 	BlueInitializeResourceLoading();
 
