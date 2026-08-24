@@ -841,7 +841,7 @@ PyObject* WrapTelemetryCategories( const CcpTelemetryCategories& categories )
 
 // Turns a Python sequence of BlueTelemetryCategory into the list CcpCore expects. Sets a Python
 // exception and returns false if the sequence holds anything else.
-bool UnwrapTelemetryCategories( PyObject* sequenceObject, const char* caller, CcpTelemetryCategories& categories )
+bool UnwrapTelemetryCategories( PyObject* sequenceObject, CcpTelemetryCategories& categories )
 {
 	PyObject* fastSequence = PySequence_Fast( sequenceObject, "expected a sequence of BlueTelemetryCategory" );
 	if( !fastSequence )
@@ -863,8 +863,7 @@ bool UnwrapTelemetryCategories( PyObject* sequenceObject, const char* caller, Cc
 			categories.clear();
 			PyErr_Format(
 				PyExc_TypeError,
-				"%s expects a sequence of BlueTelemetryCategory",
-				caller );
+				"expected a sequence of BlueTelemetryCategory");
 			return false;
 		}
 
@@ -927,7 +926,7 @@ PyObject* PySetActiveTelemetryCategories( PyObject* self, PyObject* args )
 	}
 
 	CcpTelemetryCategories categories;
-	if( !UnwrapTelemetryCategories( categoriesObject, "SetActiveTelemetryCategories", categories ) )
+	if( !UnwrapTelemetryCategories( categoriesObject, categories ) )
 	{
 		return nullptr;
 	}
